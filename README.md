@@ -1,2 +1,90 @@
 # -
 проект по файлу мвд
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import textwrap
+from google.colab import files
+
+# 1. Загружаем CSV-файл
+uploaded = files.upload()
+file_name = next(iter(uploaded))
+
+# 2. Читаем данные
+df = pd.read_csv(
+    file_name,
+    sep=";",
+    encoding="utf-8-sig",
+    engine="c"
+)
+
+# 3. Подготавливаем данные
+df["views"] = pd.to_numeric(df["views"], errors="coerce")
+df = df.dropna(subset=["views", "message"])
+
+# 4. Выбираем 10 самых просматриваемых публикаций
+top_posts = df.nlargest(10, "views").copy()
+top_posts = top_posts.sort_values("views", ascending=True)
+
+# 5. Переносим длинный текст на несколько строк
+top_posts["short_message"] = top_posts["message"].astype(str).apply(
+    lambda x: textwrap.fill(
+        x.replace("\n", " "),
+        width=35,
+        max_lines=3,
+        placeholder="..."
+    )
+)
+
+# 6. Строим график
+fig, ax = plt.subplots(figsize=(16, 12))
+
+bars = ax.barh(
+    top_posts["short_message"],
+    top_posts["views"]
+)
+
+ax.set_title(
+    "ТОП-10 самых просматриваемых публикаций",
+    fontsize=17,
+    fontweight="bold",
+    pad=20
+)
+
+ax.set_xlabel("Количество просмотров", fontsize=13)
+ax.set_ylabel("Текст публикации (Message)", fontsize=13)
+
+# 7. Добавляем цифры просмотров справа от столбцов
+max_views = top_posts["views"].max()
+ax.set_xlim(0, max_views * 1.25)
+
+for bar in bars:
+    width = bar.get_width()
+    ax.text(
+        width + max_views * 0.015,
+        bar.get_y() + bar.get_height() / 2,
+        f"{int(width):,}".replace(",", " "),
+        va="center",
+        ha="left",
+        fontsize=11,
+        fontweight="bold"
+    )
+
+# 8. Улучшаем отображение
+ax.tick_params(axis="y", labelsize=9)
+ax.tick_params(axis="x", labelsize=10)
+ax.grid(axis="x", linestyle="--", alpha=0.3)
+ax.set_axisbelow(True)
+
+plt.tight_layout()
+plt.show()
+
+# 9. Выводим подробную таблицу
+result = top_posts[["date", "message", "views"]].sort_values(
+    "views", ascending=False
+).reset_index(drop=True)
+
+result.index = result.index + 1
+result.index.name = "№"
+
+display(result)
